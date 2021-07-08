@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "aksdevjpeastsandbox-f915"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "aksdevjpeastsandbox-f915"
+  template:
+    metadata:
+      labels:
+        app: "aksdevjpeastsandbox-f915"
+    spec:
+      containers:
+        - name: "aksdevjpeastsandbox-f915"
+          image: "helmactions.azurecr.io/aksdevjpeastsandbox"
+          ports:
+          - containerPort: 80
