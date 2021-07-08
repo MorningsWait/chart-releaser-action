@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: helmactions.azurecr.io
+        username: ${{ secrets.acr_helmactions_username }}
+        password: ${{ secrets.acr_helmactions_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/NA" -f  "Dockerfile" -t helmactions.azurecr.io/aksdevjpeastsandbox:${{ github.sha }} --label dockerfile-path=Dockerfile
+        docker push helmactions.azurecr.io/aksdevjpeastsandbox:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_aksdevjpeastsandbox_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep chart-releaser-action | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace chart-releaser-action`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: chart-releaser-action
+        container-registry-url: helmactions.azurecr.io
+        container-registry-username: ${{ secrets.acr_helmactions_username }}
+        container-registry-password: ${{ secrets.acr_helmactions_password }}
+        secret-name: aksdevjpeastdockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: chart-releaser-action
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          helmactions.azurecr.io/aksdevjpeastsandbox:${{ github.sha }}
+        imagepullsecrets: |
+          aksdevjpeastdockerauth
